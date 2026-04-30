@@ -18,32 +18,11 @@ if (!fs.existsSync(uploadDir)) {
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-app.use("/uploads", express.static(uploadDir, {
-  setHeaders: (res) => {
-    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-  }
-}));
-
-app.use("/static", express.static(path.join(__dirname, "public"), {
-  setHeaders: (res) => {
-    res.setHeader("Cache-Control", "no-store");
-  }
-}));
+app.use("/uploads", express.static(uploadDir));
+app.use("/static", express.static(path.join(__dirname, "public")));
 
 function isImageFile(filename) {
   return /\.(jpe?g|png|webp)$/i.test(filename);
-}
-
-function escapeHtml(str) {
-  return String(str).replace(/[&<>"']/g, function (m) {
-    return ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      "\"": "&quot;",
-      "'": "&#039;"
-    })[m];
-  });
 }
 
 function safeFilename(originalName) {
@@ -59,20 +38,14 @@ function safeFilename(originalName) {
 }
 
 const storage = multer.diskStorage({
-  destination: function (_req, _file, cb) {
-    cb(null, uploadDir);
-  },
-  filename: function (_req, file, cb) {
-    cb(null, safeFilename(file.originalname));
-  }
+  destination: (_req, _file, cb) => cb(null, uploadDir),
+  filename: (_req, file, cb) => cb(null, safeFilename(file.originalname))
 });
 
 const upload = multer({
   storage,
-  limits: {
-    fileSize: 25 * 1024 * 1024
-  },
-  fileFilter: function (_req, file, cb) {
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
     if (!isImageFile(file.originalname)) {
       return cb(new Error("Only JPG, PNG and WEBP images are allowed."));
     }
@@ -96,28 +69,27 @@ function getImages() {
 }
 
 function requireAdmin(req, res, next) {
-  const password = req.query.password || req.body.password || req.headers["x-admin-password"];
-  if (password === ADMIN_PASSWORD) {
-    return next();
-  }
+  const password = req.query.password || req.body.password;
 
-  res.status(401).send(`<!doctype html>
-<html lang="hu">
+  if (password === ADMIN_PASSWORD) return next();
+
+  res.status(401).send(`
+<!doctype html>
+<html>
 <head>
   <meta charset="utf-8">
-  <title>Signage Admin Login</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="/static/admin.css">
+  <title>Signage Admin</title>
+  <style>
+    body{font-family:Arial;background:#111;color:#fff;padding:40px}
+    input,button{padding:12px;font-size:16px}
+  </style>
 </head>
 <body>
-  <main class="login">
-    <h1>Signage Admin</h1>
-    <form method="get" action="/admin">
-      <label>Jelszó</label>
-      <input type="password" name="password" autofocus>
-      <button type="submit">Belépés</button>
-    </form>
-  </main>
+  <h1>Signage Admin</h1>
+  <form method="get" action="/admin">
+    <input type="password" name="password" placeholder="Jelszó">
+    <button type="submit">Belépés</button>
+  </form>
 </body>
 </html>`);
 }
@@ -133,43 +105,44 @@ app.get("/api/images", (_req, res) => {
   });
 });
 
-app.get("/tv", (_req, res) => {
+app.get("/tv", (req, res) => {
   const images = getImages();
 
   const imageList = JSON.stringify(
-    images.map(img => img.url + "?v=" + Math.round(img.mtime))
+    images.map(img => "http://" + req.headers.host + img.url + "?v=" + Math.round(img.mtime))
   );
 
-  res.send(`<!doctype html>
+  res.send(`
+<!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
   <title>TV Signage</title>
   <style>
-    html, body {
-      margin: 0;
-      width: 100%;
-      height: 100%;
-      background: #000;
-      overflow: hidden;
-      cursor: none;
+    html,body{
+      margin:0;
+      width:100%;
+      height:100%;
+      background:#000;
+      overflow:hidden;
+      cursor:none;
     }
-    #photo {
-      width: 100vw;
-      height: 100vh;
-      object-fit: contain;
-      background: #000;
-      display: none;
+    #photo{
+      width:100vw;
+      height:100vh;
+      object-fit:contain;
+      background:#000;
+      display:none;
     }
-    #empty {
-      color: white;
-      font-family: Arial, sans-serif;
-      font-size: 32px;
-      position: fixed;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    #empty{
+      color:white;
+      font-family:Arial,sans-serif;
+      font-size:32px;
+      position:fixed;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
     }
   </style>
 </head>
@@ -185,8 +158,8 @@ app.get("/tv", (_req, res) => {
     var img = document.getElementById("photo");
     var empty = document.getElementById("empty");
 
-    function showNext() {
-      if (!images.length) {
+    function showNext(){
+      if(!images.length){
         img.style.display = "none";
         empty.style.display = "flex";
         return;
@@ -208,50 +181,44 @@ app.get("/tv", (_req, res) => {
 app.get("/admin", requireAdmin, (_req, res) => {
   const images = getImages();
 
-  const items = images.map((img) => `
-    <div class="card">
-      <img src="${img.url}" alt="">
-      <div class="meta">
-        <strong>${escapeHtml(img.filename)}</strong>
-        <small>${Math.round(img.size / 1024)} KB</small>
-      </div>
-      <form method="post" action="/delete">
-        <input type="hidden" name="password" value="${escapeHtml(ADMIN_PASSWORD)}">
-        <input type="hidden" name="filename" value="${escapeHtml(img.filename)}">
-        <button class="danger" type="submit">Törlés</button>
+  const items = images.map(img => `
+    <div style="background:#222;padding:12px;border-radius:10px;margin-bottom:12px">
+      <img src="${img.url}" style="max-width:220px;display:block;margin-bottom:8px">
+      <strong>${img.filename}</strong><br>
+      <small>${Math.round(img.size / 1024)} KB</small>
+      <form method="post" action="/delete" style="margin-top:8px">
+        <input type="hidden" name="password" value="${ADMIN_PASSWORD}">
+        <input type="hidden" name="filename" value="${img.filename}">
+        <button type="submit">Törlés</button>
       </form>
     </div>
   `).join("");
 
-  res.send(`<!doctype html>
-<html lang="hu">
+  res.send(`
+<!doctype html>
+<html>
 <head>
   <meta charset="utf-8">
   <title>Signage Admin</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="/static/admin.css">
+  <style>
+    body{font-family:Arial;background:#111;color:#fff;padding:30px}
+    input,button{padding:10px;font-size:16px}
+    a{color:#fff}
+  </style>
 </head>
 <body>
-  <main class="wrap">
-    <header>
-      <h1>Signage Admin</h1>
-      <a href="/tv" target="_blank">TV nézet</a>
-    </header>
+  <h1>Signage Admin</h1>
 
-    <section class="panel">
-      <h2>Kép feltöltése</h2>
-      <form method="post" action="/upload?password=${encodeURIComponent(ADMIN_PASSWORD)}" enctype="multipart/form-data">
-        <input type="hidden" name="password" value="${escapeHtml(ADMIN_PASSWORD)}">
-        <input type="file" name="image" accept="image/jpeg,image/png,image/webp" required>
-        <button type="submit">Feltöltés</button>
-      </form>
-      <p class="hint">Támogatott: JPG, PNG, WEBP. Max 25 MB.</p>
-    </section>
+  <p><a href="/tv" target="_blank">TV nézet</a></p>
 
-    <section class="grid">
-      ${items || '<p class="empty">Még nincs feltöltött kép.</p>'}
-    </section>
-  </main>
+  <form method="post" action="/upload?password=${encodeURIComponent(ADMIN_PASSWORD)}" enctype="multipart/form-data">
+    <input type="file" name="image" accept="image/jpeg,image/png,image/webp" required>
+    <button type="submit">Feltöltés</button>
+  </form>
+
+  <hr>
+
+  ${items || "<p>Még nincs feltöltött kép.</p>"}
 </body>
 </html>`);
 });
@@ -268,17 +235,15 @@ app.post("/upload", upload.single("image"), (req, res) => {
 
 app.post("/delete", requireAdmin, (req, res) => {
   const filename = path.basename(req.body.filename || "");
+
   if (filename && isImageFile(filename)) {
     const filePath = path.join(uploadDir, filename);
-    if (filePath.startsWith(uploadDir) && fs.existsSync(filePath)) {
+    if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
   }
-  res.redirect(`/admin?password=${encodeURIComponent(ADMIN_PASSWORD)}`);
-});
 
-app.use((err, _req, res, _next) => {
-  res.status(400).send(`Hiba: ${err.message}`);
+  res.redirect(`/admin?password=${encodeURIComponent(ADMIN_PASSWORD)}`);
 });
 
 app.listen(PORT, "0.0.0.0", () => {
