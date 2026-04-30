@@ -1,0 +1,12 @@
+services:
+  ihost-signage:
+    build: .
+    container_name: ihost-signage
+    restart: unless-stopped
+    ports:
+      - "8080:3000"
+    volumes:
+      - ./uploads:/app/uploads
+    environment:
+      - ADMIN_PASSWORD=changeme
+      - SLIDE_INTERVAL_MS=7000
