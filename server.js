@@ -188,7 +188,13 @@ app.get("/admin", requireAdmin, (_req, res) => {
 </html>`);
 });
 
-app.post("/upload", requireAdmin, upload.single("image"), (_req, res) => {
+app.post("/upload", upload.single("image"), (req, res) => {
+  const password = req.query.password || req.body.password;
+
+  if (password !== ADMIN_PASSWORD) {
+    return res.redirect("/admin");
+  }
+
   res.redirect(`/admin?password=${encodeURIComponent(ADMIN_PASSWORD)}`);
 });
 
