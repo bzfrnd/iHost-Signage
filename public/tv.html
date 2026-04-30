@@ -1,9 +1,8 @@
 <!doctype html>
-<html lang="hu">
+<html>
 <head>
   <meta charset="utf-8">
   <title>TV Signage</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     html, body {
       margin: 0;
@@ -17,93 +16,86 @@
     #screen {
       width: 100vw;
       height: 100vh;
+      background: #000;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #000;
     }
 
-    img {
+    #photo {
       width: 100vw;
       height: 100vh;
       object-fit: contain;
       background: #000;
-      opacity: 0;
-      transition: opacity 400ms ease;
+      display: none;
     }
 
-    img.visible {
-      opacity: 1;
-    }
-
-    .empty {
-      color: #fff;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    #empty {
+      color: white;
+      font-family: Arial, sans-serif;
       font-size: 32px;
-      opacity: .8;
-      text-align: center;
-      padding: 40px;
     }
   </style>
 </head>
 <body>
   <div id="screen">
-    <div class="empty">Nincs feltöltött kép</div>
+    <img id="photo" src="">
+    <div id="empty">Nincs feltöltött kép</div>
   </div>
 
   <script>
-    const screen = document.getElementById("screen");
-    let images = [];
-    let index = 0;
-    let intervalMs = 7000;
-    let timer = null;
+    var images = [];
+    var index = 0;
+    var intervalMs = 7000;
 
-    async function loadImages() {
-      try {
-        const res = await fetch("/api/images?ts=" + Date.now(), { cache: "no-store" });
-        const data = await res.json();
-        images = data.images || [];
-        intervalMs = data.intervalMs || 7000;
-      } catch (e) {
-        images = [];
-      }
-    }
+    function loadImages(callback) {
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", "/api/images?ts=" + new Date().getTime(), true);
 
-    function showEmpty() {
-      screen.innerHTML = '<div class="empty">Nincs feltöltött kép</div>';
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4 && xhr.status === 200) {
+          try {
+            var data = JSON.parse(xhr.responseText);
+            images = data.images || [];
+            intervalMs = data.intervalMs || 7000;
+          } catch (e) {
+            images = [];
+          }
+
+          callback();
+        }
+      };
+
+      xhr.send();
     }
 
     function showNext() {
+      var img = document.getElementById("photo");
+      var empty = document.getElementById("empty");
+
       if (!images.length) {
-        showEmpty();
+        img.style.display = "none";
+        empty.style.display = "block";
         return;
       }
 
-      const item = images[index % images.length];
+      empty.style.display = "none";
+      img.style.display = "block";
+
+      var item = images[index % images.length];
       index++;
 
-      const img = new Image();
-      img.onload = () => {
-        screen.innerHTML = "";
-        screen.appendChild(img);
-        requestAnimationFrame(() => img.classList.add("visible"));
-      };
       img.src = item.url + "?v=" + Math.round(item.mtime);
     }
 
-    async function start() {
-      await loadImages();
-      showNext();
-
-      if (timer) clearInterval(timer);
-
-      timer = setInterval(async () => {
-        await loadImages();
+    function tick() {
+      loadImages(function () {
         showNext();
-      }, intervalMs);
+      });
     }
 
-    start();
+    tick();
+    setInterval(tick, intervalMs);
   </script>
 </body>
 </html>
