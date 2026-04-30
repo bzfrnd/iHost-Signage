@@ -172,7 +172,7 @@ app.get("/admin", requireAdmin, (_req, res) => {
 
     <section class="panel">
       <h2>Kép feltöltése</h2>
-      <form method="post" action="/upload" enctype="multipart/form-data">
+      <form method="post" action="/upload?password=${encodeURIComponent(ADMIN_PASSWORD)}" enctype="multipart/form-data">
         <input type="hidden" name="password" value="${escapeHtml(ADMIN_PASSWORD)}">
         <input type="file" name="image" accept="image/jpeg,image/png,image/webp" required>
         <button type="submit">Feltöltés</button>
