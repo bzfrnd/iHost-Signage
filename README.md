@@ -12,7 +12,7 @@ Mini local signage server for Sonoff iHost / Docker.
 ## Telepítés repositoryból
 
 ```bash
-git clone https://github.com/FELHASZNALO/ihost-signage.git
+git clone https://github.com/bzfrnd/ihost-signage.git
 cd ihost-signage
 docker compose up -d --build
 ```
