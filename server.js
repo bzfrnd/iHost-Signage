@@ -134,7 +134,75 @@ app.get("/api/images", (_req, res) => {
 });
 
 app.get("/tv", (_req, res) => {
-  res.sendFile(path.join(__dirname, "public", "tv.html"));
+  const images = getImages();
+
+  const imageList = JSON.stringify(
+    images.map(img => img.url + "?v=" + Math.round(img.mtime))
+  );
+
+  res.send(`<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>TV Signage</title>
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      cursor: none;
+    }
+    #photo {
+      width: 100vw;
+      height: 100vh;
+      object-fit: contain;
+      background: #000;
+      display: none;
+    }
+    #empty {
+      color: white;
+      font-family: Arial, sans-serif;
+      font-size: 32px;
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <img id="photo">
+  <div id="empty">Nincs feltöltött kép</div>
+
+  <script>
+    var images = ${imageList};
+    var index = 0;
+    var intervalMs = ${SLIDE_INTERVAL_MS};
+
+    var img = document.getElementById("photo");
+    var empty = document.getElementById("empty");
+
+    function showNext() {
+      if (!images.length) {
+        img.style.display = "none";
+        empty.style.display = "flex";
+        return;
+      }
+
+      empty.style.display = "none";
+      img.style.display = "block";
+      img.src = images[index % images.length];
+      index++;
+    }
+
+    showNext();
+    setInterval(showNext, intervalMs);
+  </script>
+</body>
+</html>`);
 });
 
 app.get("/admin", requireAdmin, (_req, res) => {
